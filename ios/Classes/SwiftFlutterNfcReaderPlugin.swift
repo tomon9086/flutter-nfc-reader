@@ -3,10 +3,10 @@ import Foundation
 import CoreNFC
 import VYNFCKit
 
-@available(iOS 11.0, *)
+@available(iOS 13.0, *)
 public class SwiftFlutterNfcReaderPlugin: NSObject, FlutterPlugin {
     
-    fileprivate var nfcSession: NFCNDEFReaderSession? = nil
+    fileprivate var nfcSession: NFCTagReaderSession? = nil
     fileprivate var instruction: String? = nil
     fileprivate var resulter: FlutterResult? = nil
     fileprivate var readResult: FlutterResult? = nil
@@ -49,12 +49,12 @@ public class SwiftFlutterNfcReaderPlugin: NSObject, FlutterPlugin {
 }
 
 // MARK: - NFC Actions
-@available(iOS 11.0, *)
+@available(iOS 13.0, *)
 extension SwiftFlutterNfcReaderPlugin {
     func activateNFC(_ instruction: String?) {
         print("activate")
         
-        nfcSession = NFCNDEFReaderSession(delegate: self, queue: DispatchQueue(label: "queueName", attributes: .concurrent), invalidateAfterFirstRead: true)
+        nfcSession = NFCTagReaderSession(pollingOption: .iso18092, delegate: self)
         
         // then setup a new session
         if let instruction = instruction {
@@ -85,76 +85,63 @@ extension SwiftFlutterNfcReaderPlugin {
 }
 
 // MARK: - NFCDelegate
-@available(iOS 11.0, *)
-extension SwiftFlutterNfcReaderPlugin : NFCNDEFReaderSessionDelegate {
+@available(iOS 13.0, *)
+extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
     
-    public func readerSession(_ session: NFCNDEFReaderSession, didDetectNDEFs messages: [NFCNDEFMessage]) {
-        print(messages)
-        guard let message = messages.first else { return }
-        guard let payload = message.records.first else { return }
-        
-        print(payload.identifier as NSData)
-        
-        // Start Package
-        
-        let parsedPayload = VYNFCNDEFPayloadParser.parse(payload)
-        var text = ""
-        var urlString = ""
-        
-        if let parsedPayload = parsedPayload as? VYNFCNDEFTextPayload {
-            // text = "[Text payload]\n"
-            text = String(format: "%@%@", text, parsedPayload.text)
-        } else if let parsedPayload = parsedPayload as? VYNFCNDEFURIPayload {
-            // text = "[URI payload]\n"
-            text = String(format: "%@%@", text, parsedPayload.uriString)
-            urlString = parsedPayload.uriString
-        } else if let parsedPayload = parsedPayload as? VYNFCNDEFTextXVCardPayload {
-            // text = "[TextXVCard payload]\n"
-            text = String(format: "%@%@", text, parsedPayload.text)
-        } else if let sp = parsedPayload as? VYNFCNDEFSmartPosterPayload {
-            // text = "[SmartPoster payload]\n"
-            for textPayload in sp.payloadTexts {
-                if let textPayload = textPayload as? VYNFCNDEFTextPayload {
-                    text = String(format: "%@%@\n", text, textPayload.text)
+    public func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
+    }
+    
+    public func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
+        let tag = tags.first!
+        session.connect(to: tag) { error in
+            if let error = error {
+                print("Error: ", error)
+                return
+            }
+            guard case let .feliCa(feliCaTag) = tag else {
+                session.alertMessage = "Detected not-felica card."
+                return
+            }
+
+            let historyServiceCode = Data([0x09, 0x0f].reversed())
+            feliCaTag.requestService(nodeCodeList: [historyServiceCode]) { nodes, error in
+                if let error = error {
+                    print("Error: ", error)
+                    return
+                }
+
+                guard let data = nodes.first, data != Data([0xff, 0xff]) else {
+                    print("Service not exists.")
+                    return
+                }
+
+                let blockList = (0..<12).map {
+                    Data([0x80, UInt8($0)])
+                }
+
+                feliCaTag.readWithoutEncryption(serviceCodeList: [historyServiceCode], blockList: blockList) { status1, status2, dataList, error in          
+                    if let error = error {
+                        print("Error: ", error)
+                        return
+                    }
+                    guard status1 == 0x00, status2 == 0x00 else {
+                        print("Status flag error: ", status1, " / ", status2)
+                        return
+                    }
+                    session.invalidate()
+                    
+                    session.alertMessage = dataList[0].description
                 }
             }
-            text = String(format: "%@%@", text, sp.payloadURI.uriString)
-            urlString = sp.payloadURI.uriString
-        } else if let wifi = parsedPayload as? VYNFCNDEFWifiSimpleConfigPayload {
-            for case let credential as VYNFCNDEFWifiSimpleConfigCredential in wifi.credentials {
-                text = String(format: "%@SSID: %@\nPassword: %@\nMac Address: %@\nAuth Type: %@\nEncrypt Type: %@",
-                              text, credential.ssid, credential.networkKey, credential.macAddress,
-                              VYNFCNDEFWifiSimpleConfigCredential.authTypeString(credential.authType),
-                              VYNFCNDEFWifiSimpleConfigCredential.encryptTypeString(credential.encryptType)
-                )
-            }
-            if let version2 = wifi.version2 {
-                text = String(format: "%@\nVersion2: %@", text, version2.version)
-            }
-        } else {
-            text = "";
         }
-        print(text)
-        
-        // end package
-        
-        let data = [kId: "", kContent: text, kError: "", kStatus: "reading"]
-        sendNfcEvent(data: data);
-        readResult?(data)
-        readResult=nil
-        //disableNFC()
     }
-    
-    public func readerSession(_ session: NFCNDEFReaderSession, didInvalidateWithError error: Error) {
-        print(error.localizedDescription)
-        let data = [kId: "", kContent: "", kError: error.localizedDescription, kStatus: "error"]
-        resulter?(data)
-        disableNFC()
+
+    public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
     }
-    
+
 }
 
-@available(iOS 11.0, *)
+@available(iOS 13.0, *)
 extension SwiftFlutterNfcReaderPlugin: FlutterStreamHandler {
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         eventSink = nil

@@ -54,8 +54,8 @@ class _NfcScanState extends State<NfcScan> {
           controller: writerController,
         ),
         RaisedButton(
-          onPressed: () {
-            FlutterNfcReader.read();
+          onPressed: () async {
+            print(await FlutterNfcReader.read());
           },
           child: Text("Read"),
         ),
