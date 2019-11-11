@@ -69,7 +69,7 @@ extension SwiftFlutterNfcReaderPlugin {
     }
     
     func disableNFC() {
-        //nfcSession?.invalidate()
+        nfcSession?.invalidate()
         let data = [kId: "", kContent: "", kError: "", kStatus: "stopped"]
         
         resulter?(data)
@@ -119,24 +119,29 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                     Data([0x80, UInt8($0)])
                 }
 
-                feliCaTag.readWithoutEncryption(serviceCodeList: [historyServiceCode], blockList: blockList) { status1, status2, dataList, error in          
-                    if let error = error {
-                        print("Error: ", error)
-                        return
-                    }
-                    guard status1 == 0x00, status2 == 0x00 else {
-                        print("Status flag error: ", status1, " / ", status2)
-                        return
-                    }
-                    session.invalidate()
-                    
-                    session.alertMessage = dataList[0].description
-                }
+                // feliCaTag.readWithoutEncryption(serviceCodeList: [historyServiceCode], blockList: blockList) { status1, status2, dataList, error in          
+                //     if let error = error {
+                //         print("Error: ", error)
+                //         return
+                //     }
+                //     guard status1 == 0x00, status2 == 0x00 else {
+                //         print("Status flag error: ", status1, " / ", status2)
+                //         return
+                //     }                    
+                // }
+                
+                let idm = feliCaTag.currentIDm.map { String(format: "%.2hhx", $0) }.joined()
+                let systemCode = feliCaTag.currentSystemCode.map { String(format: "%.2hhx", $0) }.joined()
+
+                session.alertMessage = "IDm: \(idm)\nSystem Code: \(systemCode)"
+
+                session.invalidate()
             }
         }
     }
 
     public func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
+        session.alertMessage = "Error"
     }
 
 }
