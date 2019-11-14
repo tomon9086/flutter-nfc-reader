@@ -54,7 +54,7 @@ extension SwiftFlutterNfcReaderPlugin {
     func activateNFC(_ instruction: String?) {
         print("activate")
         
-        nfcSession = NFCTagReaderSession(pollingOption: .iso18092, delegate: self)
+        nfcSession = NFCTagReaderSession(pollingOption: [.iso14443, .iso18092], delegate: self)
         
         // then setup a new session
         if let instruction = instruction {
@@ -98,45 +98,97 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                 print("Error: ", error)
                 return
             }
-            guard case let .feliCa(feliCaTag) = tag else {
-                session.alertMessage = "Detected not-felica card."
+            if case let .feliCa(feliCaTag) = tag {
+                session.alertMessage = "Detected felica card."
+                session.invalidate()
+                return
+            }
+            guard case let .iso7816(menkyoTag) = tag else {
+                // let retryInterval = DispatchTimeInterval.milliseconds(1000)
+                // let alertedMessage = session.alertMessage
+                // session.alertMessage = self.localizedString(key: "nfcTagReaderSessionDifferentTagTypeErrorMessage")
+                // DispatchQueue.global().asyncAfter(deadline: .now() + retryInterval, execute: {
+                //     session.restartPolling()
+                //     session.alertMessage = alertedMessage
+                // })
+                session.invalidate(errorMessage: "Detected not driver-licence-card.")
                 return
             }
 
-            let historyServiceCode = Data([0x09, 0x0f].reversed())
-            feliCaTag.requestService(nodeCodeList: [historyServiceCode]) { nodes, error in
-                if let error = error {
-                    print("Error: ", error)
-                    return
-                }
+            // let historyServiceCode = Data([0x09, 0x0f].reversed())
+            // feliCaTag.requestService(nodeCodeList: [historyServiceCode]) { nodes, error in
+            //     if let error = error {
+            //         print("Error: ", error)
+            //         return
+            //     }
 
-                guard let data = nodes.first, data != Data([0xff, 0xff]) else {
-                    print("Service not exists.")
-                    return
-                }
+            //     guard let data = nodes.first, data != Data([0xff, 0xff]) else {
+            //         print("Service not exists.")
+            //         return
+            //     }
 
-                let blockList = (0..<12).map {
-                    Data([0x80, UInt8($0)])
-                }
-
-                // feliCaTag.readWithoutEncryption(serviceCodeList: [historyServiceCode], blockList: blockList) { status1, status2, dataList, error in          
-                //     if let error = error {
-                //         print("Error: ", error)
-                //         return
-                //     }
-                //     guard status1 == 0x00, status2 == 0x00 else {
-                //         print("Status flag error: ", status1, " / ", status2)
-                //         return
-                //     }                    
-                // }
+            //     let blockList = (0..<12).map {
+            //         Data([0x80, UInt8($0)])
+            //     }
                 
-                let idm = feliCaTag.currentIDm.map { String(format: "%.2hhx", $0) }.joined()
-                let systemCode = feliCaTag.currentSystemCode.map { String(format: "%.2hhx", $0) }.joined()
+            //     let idm = feliCaTag.currentIDm.map { String(format: "%.2hhx", $0) }.joined()
+            //     let systemCode = feliCaTag.currentSystemCode.map { String(format: "%.2hhx", $0) }.joined()
 
-                session.alertMessage = "IDm: \(idm)\nSystem Code: \(systemCode)"
+            //     session.alertMessage = "IDm: \(idm)\nSystem Code: \(systemCode)"
 
-                session.invalidate()
-            }
+            //     session.invalidate()
+            // }
+            
+            menkyoTag.sendCommand(
+                apdu: NFCISO7816APDU(
+                    instructionClass: 0x00,
+                    instructionCode: 0xA4,
+                    p1Parameter: 0x02,
+                    p2Parameter: 0x0C,
+                    data: Data([0x00, 0x01]),
+                    expectedResponseLength: -1
+                ),
+                completionHandler: { responseData, sw1, sw2, error in
+                    if let error = error {
+                        print(error.localizedDescription)
+                        session.invalidate(errorMessage: "SELECT FILE EF\n\(error.localizedDescription)")
+                        return
+                    }
+                    
+                    if sw1 != 0x90 {
+                        session.invalidate(errorMessage: "<Error select-file>\nsw1: 0x\(String(sw1, radix: 16)),\nsw2: 0x\(String(sw2, radix: 16))")
+                        return
+                    }
+
+                    menkyoTag.sendCommand(
+                        apdu: NFCISO7816APDU(
+                            instructionClass: 0x00,
+                            instructionCode: 0xB0,
+                            p1Parameter: 0x80,
+                            p2Parameter: 0x00,
+                            data: Data([]),
+                            expectedResponseLength: 0
+                        ),
+                        completionHandler: { responseData, sw1, sw2, error in
+                            if let error = error {
+                                print(error.localizedDescription)
+                                session.invalidate(errorMessage: "READ BINARY\n\(error.localizedDescription)")
+                            }
+                            
+                            if sw1 != 0x90 {
+                                session.invalidate(errorMessage: "<Error read-common-data>\nsw1: 0x\(String(sw1, radix: 16)),\nsw2: 0x\(String(sw2, radix: 16))")
+                                return
+                            }
+                            
+                            session.alertMessage = String(bytes: [UInt8](responseData), encoding: .utf8) ?? "Could not convert card data to string."
+                            
+                            // driversLicenseCard = driversLicenseCard.convert(items: .commonData, from: responseData)
+                            
+                            session.invalidate()
+                        }
+                    )
+                }
+            )
         }
     }
 
