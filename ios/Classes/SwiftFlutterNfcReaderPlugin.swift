@@ -164,10 +164,10 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                         apdu: NFCISO7816APDU(
                             instructionClass: 0x00,
                             instructionCode: 0xB0,
-                            p1Parameter: 0x80,
+                            p1Parameter: 0x00,
                             p2Parameter: 0x00,
                             data: Data([]),
-                            expectedResponseLength: 0
+                            expectedResponseLength: 17
                         ),
                         completionHandler: { responseData, sw1, sw2, error in
                             if let error = error {
