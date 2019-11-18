@@ -43,13 +43,15 @@ class FlutterNfcReaderPlugin(val registrar: Registrar) : MethodCallHandler, Even
 
     private var nfcAdapter: NfcAdapter? = null
     private var nfcManager: NfcManager? = null
-//
+
+    //dataに何かしら渡してみたいので一応定義しておく
     private var kId = "nfcId"
     private var kContent = "nfcContent"
     private var kError = "nfcError"
     private var kStatus = "nfcStatus"
     private var kWrite = ""
     private var kPath = ""
+
     private var readResult: Result? = null
 //    private var writeResult: Result? = null
     private var tag: Tag? = null
@@ -78,58 +80,58 @@ class FlutterNfcReaderPlugin(val registrar: Registrar) : MethodCallHandler, Even
 //        textView.setMovementMethod(ScrollingMovementMethod.getInstance())
 //    }
 
-//     fun onNewIntent(intent: Intent?) {
-//        if(readResult != null) {
-//            return
-//        }
-//
-//        val tag = intent?.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
-//
-//        if (tag != null){
-//            val result = read(tag)
-//            val ndef = Ndef.get(tag)
-//            ndef?.connect()
-//            val ndefMessage = ndef?.ndefMessage ?: ndef?.cachedNdefMessage
-//            val message = ndefMessage?.toByteArray()
-//                    ?.toString(Charset.forName("UTF-8")) ?: ""
-//            //val id = tag?.id?.toString(Charset.forName("ISO-8859-1")) ?: ""
-//            val id = bytesToHexString(tag?.id) ?: ""
-//            ndef?.close()
-//            val data = mapOf(kId to id, kContent to message, kError to "", kStatus to "reading")
-//            val mainHandler = Handler(Looper.getMainLooper())
-//            mainHandler.post {
-//
-////                Toast.makeText(this, "tag: '$tag', id: '${tag.id.joinToString(" ")}'", Toast.LENGTH_SHORT).show()
-////                var i = 0
-////                var text = ""
-////                result?.blocks?.forEach {
-////                    var rireki = Rireki.parse(it)
-////                    Log.d("FelicaRireki", rireki.toString())
-////                    var outputText = "${text}${rireki.toString()}"
-////                    text = outputText
-////                    i++
-////                }
-//
-//                readResult?.success(data)
-//                readResult = null
-//            }
-//        } else {
-//            Log.d("FALSE", "$intent")
-//                            // convert tag to NDEF tag
-//            val ndef = Ndef.get(tag)
-//            ndef?.connect()
-//            val ndefMessage = ndef?.ndefMessage ?: ndef?.cachedNdefMessage
-//            val message = ndefMessage?.toByteArray()
-//                    ?.toString(Charset.forName("UTF-8")) ?: ""
-//            val id = bytesToHexString(tag?.id) ?: ""
-//            ndef?.close()
-//            val data = mapOf(kId to id, kContent to message, kError to "", kStatus to "reading")
-//            val mainHandler = Handler(Looper.getMainLooper())
-//            mainHandler.post {
-//                eventChannel?.success(data);
-//            }
-//        }
-//    }
+     fun onNewIntent(intent: Intent?) {
+        if(readResult != null) {
+            return
+        }
+
+        val tag = intent?.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+
+        if (tag != null){
+            val result = read(tag)
+            val ndef = Ndef.get(tag)
+            ndef?.connect()
+            val ndefMessage = ndef?.ndefMessage ?: ndef?.cachedNdefMessage
+            val message = ndefMessage?.toByteArray()
+                    ?.toString(Charset.forName("UTF-8")) ?: ""
+            //val id = tag?.id?.toString(Charset.forName("ISO-8859-1")) ?: ""
+            val id = bytesToHexString(tag?.id) ?: ""
+            ndef?.close()
+            val data = mapOf(kId to id, kContent to message, kError to "", kStatus to "reading")
+            val mainHandler = Handler(Looper.getMainLooper())
+            mainHandler.post {
+
+//                Toast.makeText(this, "tag: '$tag', id: '${tag.id.joinToString(" ")}'", Toast.LENGTH_SHORT).show()
+//                var i = 0
+//                var text = ""
+//                result?.blocks?.forEach {
+//                    var rireki = Rireki.parse(it)
+//                    Log.d("FelicaRireki", rireki.toString())
+//                    var outputText = "${text}${rireki.toString()}"
+//                    text = outputText
+//                    i++
+//                }
+
+                readResult?.success(data)
+                readResult = null
+            }
+        } else {
+            Log.d("FALSE", "$intent")
+                            // convert tag to NDEF tag
+            val ndef = Ndef.get(tag)
+            ndef?.connect()
+            val ndefMessage = ndef?.ndefMessage ?: ndef?.cachedNdefMessage
+            val message = ndefMessage?.toByteArray()
+                    ?.toString(Charset.forName("UTF-8")) ?: ""
+            val id = bytesToHexString(tag?.id) ?: ""
+            ndef?.close()
+            val data = mapOf(kId to id, kContent to message, kError to "", kStatus to "reading")
+            val mainHandler = Handler(Looper.getMainLooper())
+            mainHandler.post {
+                eventChannel?.success(data);
+            }
+        }
+    }
 
     init {
         nfcManager = activity.getSystemService(Context.NFC_SERVICE) as? NfcManager
@@ -147,62 +149,62 @@ class FlutterNfcReaderPlugin(val registrar: Registrar) : MethodCallHandler, Even
         }
     }
 
-    private fun writeMessageToTag(nfcMessage: NdefMessage, tag: Tag?): Boolean {
+//    private fun writeMessageToTag(nfcMessage: NdefMessage, tag: Tag?): Boolean {
+//
+//        try {
+//            val nDefTag = Ndef.get(tag)
+//
+//            nDefTag?.let {
+//                it.connect()
+//                if (it.maxSize < nfcMessage.toByteArray().size) {
+//                    //Message to large to write to NFC tag
+//                    return false
+//                }
+//                return if (it.isWritable) {
+//                    it.writeNdefMessage(nfcMessage)
+//                    it.close()
+//                    //Message is written to tag
+//                    true
+//                } else {
+//                    //NFC tag is read-only
+//                    false
+//                }
+//            }
+//
+//            val nDefFormatableTag = NdefFormatable.get(tag)
+//
+//            nDefFormatableTag?.let {
+//                return try {
+//                    it.connect()
+//                    it.format(nfcMessage)
+//                    it.close()
+//                    //The data is written to the tag
+//                    true
+//                } catch (e: IOException) {
+//                    //Failed to format tag
+//                    false
+//                }
+//            }
+//            //NDEF is not supported
+//            return false
+//
+//        } catch (e: Exception) {
+//            //Write operation has failed
+//        }
+//        return false
+//    }
 
-        try {
-            val nDefTag = Ndef.get(tag)
-
-            nDefTag?.let {
-                it.connect()
-                if (it.maxSize < nfcMessage.toByteArray().size) {
-                    //Message to large to write to NFC tag
-                    return false
-                }
-                return if (it.isWritable) {
-                    it.writeNdefMessage(nfcMessage)
-                    it.close()
-                    //Message is written to tag
-                    true
-                } else {
-                    //NFC tag is read-only
-                    false
-                }
-            }
-
-            val nDefFormatableTag = NdefFormatable.get(tag)
-
-            nDefFormatableTag?.let {
-                return try {
-                    it.connect()
-                    it.format(nfcMessage)
-                    it.close()
-                    //The data is written to the tag
-                    true
-                } catch (e: IOException) {
-                    //Failed to format tag
-                    false
-                }
-            }
-            //NDEF is not supported
-            return false
-
-        } catch (e: Exception) {
-            //Write operation has failed
-        }
-        return false
-    }
-
-    fun createNFCMessage(payload: String?, intent: Intent?): Boolean {
-
-        val pathPrefix = "it.matteocrippa.flutternfcreader"
-        val nfcRecord = NdefRecord(NdefRecord.TNF_EXTERNAL_TYPE, pathPrefix.toByteArray(), ByteArray(0), (payload as String).toByteArray())
-        val nfcMessage = NdefMessage(arrayOf(nfcRecord))
-        intent?.let {
-            val tag = it.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
-            return writeMessageToTag(nfcMessage, tag)
-        }
-        return false
-    }
+//    fun createNFCMessage(payload: String?, intent: Intent?): Boolean {
+//
+//        val pathPrefix = "it.matteocrippa.flutternfcreader"
+//        val nfcRecord = NdefRecord(NdefRecord.TNF_EXTERNAL_TYPE, pathPrefix.toByteArray(), ByteArray(0), (payload as String).toByteArray())
+//        val nfcMessage = NdefMessage(arrayOf(nfcRecord))
+//        intent?.let {
+//            val tag = it.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+//            return writeMessageToTag(nfcMessage, tag)
+//        }
+//        return false
+//    }
 
     override fun onMethodCall(call: MethodCall, result: Result): Unit {
 
@@ -247,15 +249,11 @@ class FlutterNfcReaderPlugin(val registrar: Registrar) : MethodCallHandler, Even
         eventChannel =  null;
     }
 
-
-
     private fun stopNFC() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             nfcAdapter?.disableReaderMode(activity)
         }
     }
-
-
 //
 //    private fun readTag() {
 //        if (readResult != null) {
