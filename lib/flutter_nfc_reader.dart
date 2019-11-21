@@ -70,6 +70,8 @@ class FlutterNfcReader {
     final Map data = await _channel.invokeMethod('NfcRead');
     final NfcData result = NfcData.fromMap(data);
 
+    print(result.id);
+
     return result;
   }
 

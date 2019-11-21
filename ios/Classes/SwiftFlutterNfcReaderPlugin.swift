@@ -98,8 +98,15 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                 print("Error: ", error)
                 return
             }
-            if case let .feliCa(feliCaTag) = tag {
+            if case let .feliCa(feliCaTag) = tag { [self]
                 session.alertMessage = "Detected felica card."
+                let data = [
+                    self.kId: feliCaTag.currentIDm.map { String(format: "%.2hhx", $0) }.joined(),
+                    self.kContent: "",
+                    self.kError: "",
+                    self.kStatus: "read"
+                ]
+                self.readResult?(data)
                 session.invalidate()
                 return
             }
@@ -143,10 +150,10 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                 apdu: NFCISO7816APDU(
                     instructionClass: 0x00,
                     instructionCode: 0xA4,
-                    p1Parameter: 0x02,
-                    p2Parameter: 0x0C,
-                    data: Data([0x00, 0x01]),
-                    expectedResponseLength: -1
+                    p1Parameter: 0x00,
+                    p2Parameter: 0x00,
+                    data: Data([0x3F, 0x00]),
+                    expectedResponseLength: 2
                 ),
                 completionHandler: { responseData, sw1, sw2, error in
                     if let error = error {
@@ -164,7 +171,7 @@ extension SwiftFlutterNfcReaderPlugin : NFCTagReaderSessionDelegate {
                         apdu: NFCISO7816APDU(
                             instructionClass: 0x00,
                             instructionCode: 0xB0,
-                            p1Parameter: 0x00,
+                            p1Parameter: 0x8B,
                             p2Parameter: 0x00,
                             data: Data([]),
                             expectedResponseLength: 17
